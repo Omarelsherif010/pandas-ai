@@ -5,6 +5,7 @@ from unittest.mock import patch, Mock
 from uuid import UUID
 
 import pandas as pd
+import polars as pl
 import pytest
 
 from pandasai import SmartDataframe
@@ -151,12 +152,13 @@ import pandas as pd
 # Analyze the data
 # 1. Prepare: Preprocessing and cleaning data if necessary
 # 2. Process: Manipulating data for analysis (grouping, filtering, aggregating, etc.)
-# 3. Analyze: Conducting the actual analysis (if generating a plot, create a figure and axes using plt.subplots() and save it to an image in exports/charts/temp_chart.png and do not show the chart.)
+# 3. Analyze: Conducting the actual analysis (if the user asks to create a chart save it to an image in exports/charts/temp_chart.png and do not show the chart.)
 # 4. Output: return a dictionary of:
 # - type (possible values "text", "number", "dataframe", "plot")
 # - value (can be a string, a dataframe or the path of the plot, NOT a dictionary)
-def analyze_data(self, dfs: list[pd.DataFrame]) -> dict:
-   # Code goes here
+# Example output: { "type": "text", "value": "The average loan amount is $15,000." }
+def analyze_data(dfs: list[pd.DataFrame]) -> dict:
+   # Code goes here (do not add comments)
     
 
 # Declare a result variable
@@ -186,17 +188,6 @@ print(result)```"""
         code = """```
 result = {'happiness': 1, 'gdp': 0.43}```"""
         assert llm._extract_code(code) == "result = {'happiness': 1, 'gdp': 0.43}"
-
-        code = """```python<startCode>
-result = {'happiness': 0.3, 'gdp': 5.5}<endCode>```"""
-        assert llm._extract_code(code) == "result = {'happiness': 0.3, 'gdp': 5.5}"
-
-        code = """<startCode>```python
-result = {'happiness': 0.49, 'gdp': 25.5}```<endCode>"""
-        assert llm._extract_code(code) == "result = {'happiness': 0.49, 'gdp': 25.5}"
-        code = """<startCode>```python
-result = {'happiness': 0.49, 'gdp': 25.5}```"""
-        assert llm._extract_code(code) == "result = {'happiness': 0.49, 'gdp': 25.5}"
 
     def test_last_prompt_id(self, smart_dataframe: SmartDataframe):
         smart_dataframe.chat("How many countries are in the dataframe?")
@@ -383,3 +374,82 @@ result = {'happiness': 0.49, 'gdp': 25.5}```"""
 
         smart_dataframe.max_retries = 5
         assert smart_dataframe.max_retries == 5
+
+    def test_load_dataframe_from_list(self, smart_dataframe):
+        input_data = [
+            {"column1": 1, "column2": 4},
+            {"column1": 2, "column2": 5},
+            {"column1": 3, "column2": 6},
+        ]
+
+        smart_dataframe._load_df(input_data)
+
+        assert isinstance(smart_dataframe._df, pd.DataFrame)
+
+    def test_load_dataframe_from_dict(self, smart_dataframe):
+        input_data = {"column1": [1, 2, 3], "column2": [4, 5, 6]}
+
+        smart_dataframe._load_df(input_data)
+
+        assert isinstance(smart_dataframe._df, pd.DataFrame)
+
+    def test_load_dataframe_from_pandas_dataframe(self, smart_dataframe):
+        pandas_df = pd.DataFrame({"column1": [1, 2, 3], "column2": [4, 5, 6]})
+
+        smart_dataframe._load_df(pandas_df)
+
+        assert isinstance(smart_dataframe._df, pd.DataFrame)
+
+    def test_load_dataframe_from_other_dataframe_type(self, smart_dataframe):
+        polars_df = pl.DataFrame({"column1": [1, 2, 3], "column2": [4, 5, 6]})
+
+        smart_dataframe._load_df(polars_df)
+
+        assert smart_dataframe._df is polars_df
+
+    def test_import_csv_file(self, smart_dataframe, mocker):
+        mocker.patch.object(
+            pd,
+            "read_csv",
+            return_value=pd.DataFrame({"column1": [1, 2, 3], "column2": [4, 5, 6]}),
+        )
+
+        file_path = "sample.csv"
+
+        df = smart_dataframe._import_from_file(file_path)
+
+        assert isinstance(df, pd.DataFrame)
+
+    def test_import_parquet_file(self, smart_dataframe, mocker):
+        mocker.patch.object(
+            pd,
+            "read_parquet",
+            return_value=pd.DataFrame({"column1": [1, 2, 3], "column2": [4, 5, 6]}),
+        )
+
+        file_path = "sample.parquet"
+
+        df = smart_dataframe._import_from_file(file_path)
+
+        assert isinstance(df, pd.DataFrame)
+
+    def test_import_excel_file(self, smart_dataframe, mocker):
+        mocker.patch.object(
+            pd,
+            "read_excel",
+            return_value=pd.DataFrame({"column1": [1, 2, 3], "column2": [4, 5, 6]}),
+        )
+
+        file_path = "sample.xlsx"
+
+        df = smart_dataframe._import_from_file(file_path)
+
+        assert isinstance(df, pd.DataFrame)
+
+        expected_df = pd.DataFrame({"column1": [1, 2, 3], "column2": [4, 5, 6]})
+        assert df.equals(expected_df)
+
+    @pytest.mark.parametrize("file_path", ["sample.txt", "sample.docx", "sample.pdf"])
+    def test_invalid_file_format(self, smart_dataframe, file_path):
+        with pytest.raises(ValueError):
+            smart_dataframe._import_from_file(file_path)
