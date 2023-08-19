@@ -25,6 +25,8 @@ class CodeManager:
     _logger: Logger = None
     _additional_dependencies: List[dict] = []
 
+    _last_code_executed: str = None
+
     def __init__(
         self,
         dfs: List,
@@ -166,7 +168,7 @@ class CodeManager:
             code = add_save_chart(
                 code,
                 logger=self._logger,
-                folder_name=prompt_id,
+                folder_name=str(prompt_id),
                 save_charts_path=self._config.save_charts_path,
             )
 
@@ -390,3 +392,11 @@ Code running:
     @property
     def middlewares(self):
         return self._middlewares
+
+    @property
+    def last_code_executed(self):
+        return self._last_code_executed
+
+    @last_code_executed.setter
+    def last_code_executed(self, code: str):
+        self._last_code_executed = code
